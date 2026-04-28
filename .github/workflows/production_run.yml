@@ -136,11 +136,15 @@ jobs:
           cp -r math/. "$HOME/math-sdk/games/wild_vs_zombies/"
 
       # ── 8. Run the simulation ───────────────────────────────────────────────
+      # Run from SDK root so relative paths like games/wild_vs_zombies/library/
+      # resolve correctly (used by analytics and format-check writers).
+      # PYTHONPATH includes both SDK and game dir so all imports resolve.
       - name: Run simulation
         run: |
-          cd math
           SDK="$HOME/math-sdk"
-          PYTHONPATH="$SDK" "$SDK/.venv/bin/python" run.py
+          GAME="$SDK/games/wild_vs_zombies"
+          cd "$SDK"
+          PYTHONPATH="$SDK:$GAME" "$SDK/.venv/bin/python" "$GAME/run.py"
         timeout-minutes: 180
 
       # ── 8. Upload publish_files as downloadable artifact ───────────────────
