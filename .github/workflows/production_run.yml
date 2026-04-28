@@ -129,7 +129,13 @@ jobs:
           print(f"Optimizer: num_per_fence={per_fence} num_show={num_show} sim_trials={sim_trials}")
           EOF
 
-      # ── 7. Run the simulation ───────────────────────────────────────────────
+      # ── 7. Link game files into SDK so analytics can import them ──────────
+      - name: Link game into math-sdk
+        run: |
+          mkdir -p "$HOME/math-sdk/games/wild_vs_zombies"
+          cp -r math/. "$HOME/math-sdk/games/wild_vs_zombies/"
+
+      # ── 8. Run the simulation ───────────────────────────────────────────────
       - name: Run simulation
         run: |
           cd math
