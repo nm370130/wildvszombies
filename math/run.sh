@@ -3,7 +3,7 @@
 # Wild vs Zombies — local simulation runner
 #
 # Usage:
-#   bash run.sh          # smoke test (10 K sims, fast)
+#   bash run.sh          # smoke test (1 K sims, fast)
 #   bash run.sh prod     # production run (1 M / 500 K sims)
 #
 # Requirements:
@@ -15,6 +15,7 @@
 SDK="$HOME/go/src/math-sdk"
 VENV="$SDK/.venv/bin/python"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GAME_DIR="$SDK/games/wild_vs_zombies"
 
 if [ ! -f "$VENV" ]; then
     echo "ERROR: venv not found at $VENV"
@@ -22,5 +23,15 @@ if [ ! -f "$VENV" ]; then
     exit 1
 fi
 
-cd "$SCRIPT_DIR"
-PYTHONPATH="$SDK" "$VENV" run.py "$@"
+# Sync game files into SDK so analytics/format-check relative paths resolve.
+# Clear library first so stale _0 LUT files from previous runs don't cause
+# index mismatches in the analytics module.
+mkdir -p "$GAME_DIR"
+rm -rf "$GAME_DIR/library"
+rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='library/' \
+    "$SCRIPT_DIR/" "$GAME_DIR/"
+
+# Run from SDK root — the SDK writes output to games/wild_vs_zombies/library/
+# using paths relative to the SDK root
+cd "$SDK"
+PYTHONPATH="$SDK:$GAME_DIR" "$VENV" "$GAME_DIR/run.py" "$@"

@@ -41,9 +41,9 @@ except ImportError:
 if __name__ == "__main__":
 
     # Threading / compression
-    threads      = 10
-    rust_threads = 8
-    batch_size   = 50_000
+    threads      = 4
+    rust_threads = 4
+    batch_size   = 500   # must be <= num_sims; SDK runs min 1 full batch
     compress     = True
     profiling    = False
 
@@ -51,15 +51,15 @@ if __name__ == "__main__":
     # Smoke test : 1_000 / 1_000   (sims only, no optimization)
     # Production : 1_000_000 / 500_000  (+ run_optimization: True)
     num_sim_args = {
-        "base":  1_000_000,   # 1 million base-game sims
-        "bonus": 500_000,     # 500 K bonus-buy sims
+        "base":  1_000,   # smoke: 1_000  | prod: 1_000_000
+        "bonus": 1_000,   # smoke: 1_000  | prod: 500_000
     }
 
     run_conditions = {
         "run_sims":          True,
-        "run_optimization":  True,   # production only — needs ≥ 200K base sims (wincap quota=0.001)
-        "run_analysis":      True,   # enable for production run
-        "run_format_checks": True,   # enable for production run
+        "run_optimization":  False,  # production only — needs ≥ 200K base sims (wincap quota=0.001)
+        "run_analysis":      True,
+        "run_format_checks": True,
     }
 
     target_modes = ["base", "bonus"]
