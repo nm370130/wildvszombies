@@ -7,15 +7,15 @@ on:
       base_sims:
         description: "Base game simulations"
         required: true
-        default: "500000"
+        default: "50000"
       bonus_sims:
         description: "Bonus buy simulations"
         required: true
-        default: "250000"
+        default: "25000"
       run_optimization:
         description: "Run RTP optimizer (Rust)"
         required: true
-        default: "true"
+        default: "false"
         type: choice
         options: ["true", "false"]
 
@@ -142,7 +142,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: publish_files-${{ github.run_number }}
-          path: "${{ env.HOME }}/math-sdk/games/wild_vs_zombies/library/publish_files/"
+          path: "$HOME/math-sdk/games/wild_vs_zombies/library/publish_files/"
           retention-days: 30
 
       # ── 9. Print RTP summary ────────────────────────────────────────────────
