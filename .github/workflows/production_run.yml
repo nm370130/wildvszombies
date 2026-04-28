@@ -1,0 +1,160 @@
+name: Production Math Run
+
+# Trigger manually from GitHub → Actions tab → "Run workflow"
+on:
+  workflow_dispatch:
+    inputs:
+      base_sims:
+        description: "Base game simulations"
+        required: true
+        default: "500000"
+      bonus_sims:
+        description: "Bonus buy simulations"
+        required: true
+        default: "250000"
+      run_optimization:
+        description: "Run RTP optimizer (Rust)"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+jobs:
+  run-math:
+    runs-on: ubuntu-latest    # 7 GB RAM, 2 vCPU — handles 500K/250K comfortably
+
+    steps:
+      # ── 1. Checkout game repo ───────────────────────────────────────────────
+      - name: Checkout wildvszombies
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python 3.13 ───────────────────────────────────────────────
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # ── 3. Clone and set up math-sdk ────────────────────────────────────────
+      # Set MATH_SDK_REPO_URL in repo Settings → Secrets → Actions
+      - name: Clone math-sdk
+        run: |
+          git clone "${{ secrets.MATH_SDK_REPO_URL }}" "$HOME/math-sdk"
+          cd "$HOME/math-sdk"
+          python3.13 -m venv .venv
+          .venv/bin/pip install -r requirements.txt
+
+      # ── 4. Install Rust ─────────────────────────────────────────────────────
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # Cache Rust build artifacts so re-runs compile in seconds
+      - name: Cache Rust build
+        uses: actions/cache@v4
+        with:
+          path: "$HOME/math-sdk/optimization_program/target"
+          key: rust-optimizer-${{ hashFiles('**/Cargo.lock') }}
+
+      # ── 5. Patch run.py with workflow inputs ────────────────────────────────
+      - name: Configure production settings
+        env:
+          BASE_SIMS:        ${{ github.event.inputs.base_sims }}
+          BONUS_SIMS:       ${{ github.event.inputs.bonus_sims }}
+          RUN_OPTIMIZATION: ${{ github.event.inputs.run_optimization }}
+        run: |
+          python3 - <<'EOF'
+          import re, os
+
+          path = "math/run.py"
+          src  = open(path).read()
+
+          base  = os.environ["BASE_SIMS"]
+          bonus = os.environ["BONUS_SIMS"]
+          opt   = os.environ["RUN_OPTIMIZATION"]
+
+          # Patch sim counts
+          src = re.sub(r'"base":\s*[\d_,]+',  f'"base":  {base}',  src)
+          src = re.sub(r'"bonus":\s*[\d_,]+', f'"bonus": {bonus}', src)
+
+          # Patch run conditions
+          src = re.sub(
+              r'"run_sims":\s*(True|False)',
+              '"run_sims":          True', src
+          )
+          src = re.sub(
+              r'"run_optimization":\s*(True|False)',
+              f'"run_optimization":  {opt.capitalize()}', src
+          )
+          src = re.sub(
+              r'"run_analysis":\s*(True|False)',
+              '"run_analysis":      True', src
+          )
+          src = re.sub(
+              r'"run_format_checks":\s*(True|False)',
+              '"run_format_checks": True', src
+          )
+
+          # Use memory-safe thread settings for GitHub runner (7 GB, 2 vCPU)
+          src = re.sub(r'threads\s*=\s*\d+',       'threads      = 2',      src)
+          src = re.sub(r'rust_threads\s*=\s*\d+',   'rust_threads = 2',      src)
+          src = re.sub(r'batch_size\s*=\s*[\d_]+',  'batch_size   = 10_000', src)
+
+          open(path, "w").write(src)
+          print("Patched run.py:")
+          print(f"  base={base}  bonus={bonus}  optimization={opt}")
+          EOF
+
+      # ── 6. Patch optimizer params for available sim count ───────────────────
+      - name: Configure optimizer parameters
+        env:
+          BASE_SIMS: ${{ github.event.inputs.base_sims }}
+        run: |
+          python3 - <<'EOF'
+          import re, os
+
+          path     = "math/game_optimization.py"
+          src      = open(path).read()
+          base     = int(os.environ["BASE_SIMS"])
+
+          # num_per_fence must be <= wincap_quota * base_sims
+          # wincap quota = 0.001 → floor at base * 0.001, cap at 10000
+          per_fence  = min(max(int(base * 0.0008), 50), 10000)
+          num_show   = min(per_fence * 2, 5000)
+          sim_trials = min(per_fence * 2, 5000)
+
+          src = re.sub(r'num_show=\d+',        f'num_show={num_show}',       src)
+          src = re.sub(r'num_per_fence=\d+',   f'num_per_fence={per_fence}', src)
+          src = re.sub(r'sim_trials=\d+',      f'sim_trials={sim_trials}',   src)
+
+          open(path, "w").write(src)
+          print(f"Optimizer: num_per_fence={per_fence} num_show={num_show} sim_trials={sim_trials}")
+          EOF
+
+      # ── 7. Run the simulation ───────────────────────────────────────────────
+      - name: Run simulation
+        run: |
+          cd math
+          SDK="$HOME/math-sdk"
+          PYTHONPATH="$SDK" "$SDK/.venv/bin/python" run.py
+        timeout-minutes: 180
+
+      # ── 8. Upload publish_files as downloadable artifact ───────────────────
+      - name: Upload publish_files
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish_files-${{ github.run_number }}
+          path: "${{ env.HOME }}/math-sdk/games/wild_vs_zombies/library/publish_files/"
+          retention-days: 30
+
+      # ── 9. Print RTP summary ────────────────────────────────────────────────
+      - name: Print RTP summary
+        run: |
+          BASE_V="$HOME/math-sdk/games/wild_vs_zombies/library/configs/books_base.verification.json"
+          BONUS_V="$HOME/math-sdk/games/wild_vs_zombies/library/configs/books_bonus.verification.json"
+          echo "────────────────────────────────────"
+          echo "  OUTPUT SUMMARY"
+          echo "────────────────────────────────────"
+          [ -f "$BASE_V" ]  && echo "Base  verification:" && cat "$BASE_V"
+          [ -f "$BONUS_V" ] && echo "Bonus verification:" && cat "$BONUS_V"
+          echo ""
+          echo "Files in publish_files/:"
+          ls -lh "$HOME/math-sdk/games/wild_vs_zombies/library/publish_files/"
