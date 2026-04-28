@@ -72,8 +72,8 @@ jobs:
           opt   = os.environ["RUN_OPTIMIZATION"]
 
           # Patch sim counts
-          src = re.sub(r'"base":\s*[\d_,]+',  f'"base":  {base}',  src)
-          src = re.sub(r'"bonus":\s*[\d_,]+', f'"bonus": {bonus}', src)
+          src = re.sub(r'"base":\s*[\d_]+',  f'"base":  {base}',  src)
+          src = re.sub(r'"bonus":\s*[\d_]+', f'"bonus": {bonus}', src)
 
           # Patch run conditions
           src = re.sub(
