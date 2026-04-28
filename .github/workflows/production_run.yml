@@ -23,6 +23,9 @@ jobs:
   run-math:
     runs-on: ubuntu-latest    # 7 GB RAM, 2 vCPU — handles 500K/250K comfortably
 
+    env:
+      MATH_SDK: /home/runner/math-sdk   # avoids $HOME expansion issues in action path fields
+
     steps:
       # ── 1. Checkout game repo ───────────────────────────────────────────────
       - name: Checkout wildvszombies
@@ -38,8 +41,8 @@ jobs:
       # Set MATH_SDK_REPO_URL in repo Settings → Secrets → Actions
       - name: Clone math-sdk
         run: |
-          git clone "${{ secrets.MATH_SDK_REPO_URL }}" "$HOME/math-sdk"
-          cd "$HOME/math-sdk"
+          git clone "${{ secrets.MATH_SDK_REPO_URL }}" "$MATH_SDK"
+          cd "$MATH_SDK"
           python3.13 -m venv .venv
           .venv/bin/pip install -r requirements.txt
 
@@ -51,7 +54,7 @@ jobs:
       - name: Cache Rust build
         uses: actions/cache@v4
         with:
-          path: "$HOME/math-sdk/optimization_program/target"
+          path: "${{ env.MATH_SDK }}/optimization_program/target"
           key: rust-optimizer-${{ hashFiles('**/Cargo.lock') }}
 
       # ── 5. Patch run.py with workflow inputs ────────────────────────────────
@@ -132,8 +135,8 @@ jobs:
       # ── 7. Link game files into SDK so analytics can import them ──────────
       - name: Link game into math-sdk
         run: |
-          mkdir -p "$HOME/math-sdk/games/wild_vs_zombies"
-          cp -r math/. "$HOME/math-sdk/games/wild_vs_zombies/"
+          mkdir -p "$MATH_SDK/games/wild_vs_zombies"
+          cp -r math/. "$MATH_SDK/games/wild_vs_zombies/"
 
       # ── 8. Run the simulation ───────────────────────────────────────────────
       # Run from SDK root so relative paths like games/wild_vs_zombies/library/
@@ -141,7 +144,7 @@ jobs:
       # PYTHONPATH includes both SDK and game dir so all imports resolve.
       - name: Run simulation
         run: |
-          SDK="$HOME/math-sdk"
+          SDK="$MATH_SDK"
           GAME="$SDK/games/wild_vs_zombies"
           cd "$SDK"
           PYTHONPATH="$SDK:$GAME" "$SDK/.venv/bin/python" "$GAME/run.py"
@@ -152,14 +155,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: publish_files-${{ github.run_number }}
-          path: "$HOME/math-sdk/games/wild_vs_zombies/library/publish_files/"
+          path: "${{ env.MATH_SDK }}/games/wild_vs_zombies/library/publish_files/"
           retention-days: 30
 
       # ── 9. Print RTP summary ────────────────────────────────────────────────
       - name: Print RTP summary
         run: |
-          BASE_V="$HOME/math-sdk/games/wild_vs_zombies/library/configs/books_base.verification.json"
-          BONUS_V="$HOME/math-sdk/games/wild_vs_zombies/library/configs/books_bonus.verification.json"
+          BASE_V="$MATH_SDK/games/wild_vs_zombies/library/configs/books_base.verification.json"
+          BONUS_V="$MATH_SDK/games/wild_vs_zombies/library/configs/books_bonus.verification.json"
           echo "────────────────────────────────────"
           echo "  OUTPUT SUMMARY"
           echo "────────────────────────────────────"
@@ -167,4 +170,4 @@ jobs:
           [ -f "$BONUS_V" ] && echo "Bonus verification:" && cat "$BONUS_V"
           echo ""
           echo "Files in publish_files/:"
-          ls -lh "$HOME/math-sdk/games/wild_vs_zombies/library/publish_files/"
+          ls -lh "$MATH_SDK/games/wild_vs_zombies/library/publish_files/"
