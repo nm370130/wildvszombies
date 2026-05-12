@@ -42,5 +42,13 @@ math/*.prof
 # Claude Code session memory (machine-specific, not source code)
 .claude/
 
+# Internal docs — local only, not for the repo
+CLIENT_UPDATE.md
+DEPLOY.md
+FRONTEND_HANDOFF.md
+IMPLEMENTATION_PLAN.md
+PAYTABLE_UPDATE.md
+PRODUCT_TEAM_QUESTIONS.md
+
 # Math SDK source files (belong in math-sdk repo, accessed via PYTHONPATH)
 src/
