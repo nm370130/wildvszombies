@@ -130,6 +130,7 @@ class GameExecutables(GameCalculations):
     def _trigger_wave_bar_stage(self, stage: int) -> None:
         """Handle reaching a new Wave Bar stage. Sets pending_duel_spin."""
         self.wave_bar_stage = stage
+        spin_type = "duel_spin"   # default; overridden below
 
         if stage == 2:
             spin_type = "duel_spin"
@@ -419,7 +420,7 @@ class GameExecutables(GameCalculations):
 
     # ── DuelSpin / MegaDuelSpin ───────────────────────────────────────────────
 
-    def setup_duel_spin(self, spin_type: str) -> None:
+    def setup_duel_spin(self, spin_type: str) -> bool:
         """
         Prepare the board for a DuelSpin or MegaDuelSpin.
         Guarantees 1, 2, or 3 VS symbols land as part of wins by placing
